@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+    broadcast-mirror:
+        build: ./src
+        container_name: broadcast-mirror
+        ports:
+            - "8080:8080"
+        restart: unless-stopped
+        shm_size: 64mb
+        environment:
+            ETH_NETWORK: ${ETH_NETWORK:?error}

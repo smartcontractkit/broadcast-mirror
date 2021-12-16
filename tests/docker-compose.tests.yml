@@ -1,0 +1,9 @@
+services:
+    broadcast-mirror:
+        container_name: broadcast-mirror-test
+        ports:
+            - "8089:8080"
+        environment:
+            ETH_NETWORK: "Testing"
+        logging:
+            driver: "local"
