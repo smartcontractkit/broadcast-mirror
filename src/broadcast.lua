@@ -6,6 +6,10 @@ local config = require("config")
 
 -- VARS
 local txns = ngx.shared.txns
+local request_status = {
+    ["id"] = nil,
+    ["msg"] = nil,
+}
 
 -- FUNCS
 local function log(log_level, msg, request_data)
@@ -46,28 +50,35 @@ end
 
 local function validate(value)
     log(ngx.INFO, { msg = "Received transaction", body = value })
+    -- We set the response ID to that of the first request
+    -- When multiple requests are batched, the ID of the last error is returned
+    if request_status.msg == nil and request_status.id == nil then
+        request_status.id = value.id
+    end
 
     if value.method == nil then
-        log(ngx.WARN, { msg = "Malformed request, no method set" })
-        ngx.status = ngx.HTTP_BAD_REQUEST
+        local msg = "Malformed request, no method set"
+        log(ngx.WARN, { msg = msg, id = value.id })
+        request_status.msg = msg
+        request_status.id = value.id
         return
     end
 
     if value.method ~= "eth_sendRawTransaction" then
-        log(ngx.INFO, { msg = "Unsupported RPC call", call = value.method })
-        ngx.status = ngx.HTTP_OK
+        log(ngx.INFO, { msg = "Unsupported RPC call", call = value.method, id = value.id })
         return
     end
 
     if value.params == nil or value.params[1] == nil or string.len(value.params[1]) == 0 then
-        log(ngx.WARN, { msg = "Malformed request, no params set" })
-        ngx.status = ngx.HTTP_BAD_REQUEST
+        local msg = "Malformed request, no params set"
+        log(ngx.WARN, { msg = msg, id = value.id })
+        request_status.msg = msg
+        request_status.id = value.id
         return
     end
 
     if txn_seen(value.params[1]) then
-        log(ngx.INFO, { msg = "Transaction already seen, skipping." })
-        ngx.status = ngx.HTTP_OK
+        log(ngx.INFO, { msg = "Transaction already seen, skipping.", id = value.id })
         return
     else
         return value
@@ -163,7 +174,6 @@ for _, value in ipairs(values) do
     -- nginx returns status of last parsed transaction
     local body = validate(value)
     if body ~= nil then
-        ngx.status = ngx.HTTP_OK
         for _, provider in config.providers() do
             -- threads dont have access to ngx.var, pass in for logging
             local request_data = {
@@ -176,5 +186,23 @@ for _, value in ipairs(values) do
         end
     end
 end
+
+local response = {
+    ["jsonrpc"] = "2.0",
+    ["id"] = request_status.id,
+}
+
+if request_status.msg == nil then
+    response.result = ""
+    ngx.status = ngx.HTTP_OK
+else
+    response.error = {
+        ["code"] = -32000,
+        ["message"] = request_status.msg,
+    }
+    ngx.status = ngx.HTTP_BAD_REQUEST
+end
+
+ngx.say(json.encode(response))
 
 return

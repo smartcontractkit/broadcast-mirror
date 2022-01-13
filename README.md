@@ -83,7 +83,7 @@ At the moment we have tested with ETH mainnet & testnet, as well as other EVM ch
 ### Prerequisites
 
 * docker / docker-compose
-* pipenv
+* pipenv (for testing only)
   ```sh
   pip install --user pipenv
   ```

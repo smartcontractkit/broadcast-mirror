@@ -50,6 +50,8 @@ def test_unsupported_method(http_service):
         auth=sample_auth,
     )
     assert r.status_code == 200
+    assert r.json()["id"] == 1
+    assert r.json()["result"] == ""
 
 
 def test_empty_sendRawTxn(http_service):
@@ -60,11 +62,13 @@ def test_empty_sendRawTxn(http_service):
             "jsonrpc": "2.0",
             "method": "eth_sendRawTransaction",
             "params": [""],
-            "id": 1,
+            "id": 4,
         },
         auth=sample_auth,
     )
     assert r.status_code == 400
+    assert r.json()["id"] == 4
+    assert r.json()["error"]["code"] == -32000
 
 
 def test_receive_request(http_service):
@@ -75,11 +79,13 @@ def test_receive_request(http_service):
             "jsonrpc": "2.0",
             "method": "eth_sendRawTransaction",
             "params": ["0x12345678"],
-            "id": 1,
+            "id": 5,
         },
         auth=sample_auth,
     )
     assert r.status_code == 200
+    assert r.json()["id"] == 5
+    assert r.json()["result"] == ""
 
 
 def test_multi_post(http_service):
@@ -91,18 +97,20 @@ def test_multi_post(http_service):
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": ["0x12345678"],
-                "id": 1,
+                "id": 7,
             },
             {
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": ["0x87654321"],
-                "id": 2,
+                "id": 8,
             },
         ],
         auth=sample_auth,
     )
     assert r.status_code == 200
+    assert r.json()["id"] == 7
+    assert r.json()["result"] == ""
 
 
 def test_multi_post_malformed(http_service):
@@ -114,18 +122,20 @@ def test_multi_post_malformed(http_service):
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": [""],
-                "id": 1,
+                "id": 9,
             },
             {
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": [""],
-                "id": 2,
+                "id": 10,
             },
         ],
         auth=sample_auth,
     )
     assert r.status_code == 400
+    assert r.json()["id"] == 10
+    assert r.json()["error"]["code"] == -32000
 
 
 def test_multi_post_malformed_okay(http_service):
@@ -137,15 +147,42 @@ def test_multi_post_malformed_okay(http_service):
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": ["0x12345678"],
-                "id": 1,
+                "id": 11,
             },
             {
                 "jsonrpc": "2.0",
                 "method": "eth_sendRawTransaction",
                 "params": [""],
-                "id": 2,
+                "id": 12,
             },
         ],
         auth=sample_auth,
     )
     assert r.status_code == 400
+    assert r.json()["id"] == 12
+    assert r.json()["error"]["code"] == -32000
+
+
+def test_multi_post_mixed(http_service):
+    """Handle mixed success/error."""
+    r = requests.post(
+        http_service,
+        json=[
+            {
+                "jsonrpc": "2.0",
+                "method": "eth_sendRawTransaction",
+                "params": [""],
+                "id": 13,
+            },
+            {
+                "jsonrpc": "2.0",
+                "method": "eth_sendRawTransaction",
+                "params": ["0x123456"],
+                "id": 14,
+            },
+        ],
+        auth=sample_auth,
+    )
+    assert r.status_code == 400
+    assert r.json()["id"] == 13
+    assert r.json()["error"]["code"] == -32000
