@@ -7,3 +7,12 @@ services:
             ETH_NETWORK: "Testing"
         logging:
             driver: "local"
+    broadcast-mirror-multichain:
+        build: ./src
+        restart: unless-stopped
+        shm_size: 64mb
+        container_name: broadcast-mirror-multichain-test
+        ports:
+            - "8087:8080"
+        logging:
+            driver: "local"

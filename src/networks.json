@@ -6,14 +6,7 @@
       "type": "json-rpc"
     }
   ],
-  "Kovan": [
-    {
-      "name": "Alchemy",
-      "uri": "https://eth-kovan.alchemyapi.io/v2/<<<API-KEY>>>",
-      "type": "json-rpc"
-    }
-  ],
-  "Mainnet": [
+  "1": [
     {
       "name": "Geth Local",
       "uri": "http://127.0.0.1:8545/",

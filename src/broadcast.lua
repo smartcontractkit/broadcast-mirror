@@ -12,13 +12,25 @@ local request_status = {
 }
 
 -- FUNCS
+local function get_network()
+    if config.network() == nil then
+        return ngx.var.arg_chain_id
+    else
+        return config.network()
+    end
+end
+
 local function log(log_level, msg, request_data)
     -- When calling 'log' from inside of a thread, ngx.var is unavailable,
     -- in which case we pass in those vars explicitly (via request_data)
     request_data = request_data
-        or { request_id = ngx.var.request_id, remote_user = ngx.var.remote_user, http_host = ngx.var.http_host }
+        or {
+            request_id = ngx.var.request_id,
+            remote_user = ngx.var.remote_user,
+            http_host = ngx.var.http_host,
+            chain_id = get_network(),
+        }
     msg.log_level = log_level
-    msg.network = config.network()
 
     for key, value in pairs(request_data) do
         msg[key] = value
@@ -157,6 +169,12 @@ if ngx.req.get_method() ~= "POST" or data == nil then
     return
 end
 
+if get_network() == nil then
+    log(ngx.ERR, { msg = "No CHAINID env var set and no chain_id URL parameter sent" })
+    ngx.status = ngx.HTTP_BAD_REQUEST
+    return
+end
+
 local status, values = pcall(json.decode, data)
 if not status then
     log(ngx.WARN, { msg = "Failed parsing body (not JSON?)", body = data })
@@ -174,12 +192,13 @@ for _, value in ipairs(values) do
     -- nginx returns status of last parsed transaction
     local body = validate(value)
     if body ~= nil then
-        for _, provider in config.providers() do
+        for _, provider in config.providers(get_network()) do
             -- threads dont have access to ngx.var, pass in for logging
             local request_data = {
                 request_id = ngx.var.request_id,
                 remote_user = ngx.var.remote_user,
                 http_host = ngx.var.http_host,
+                chain_id = get_network(),
             }
             -- process via background lua threads, nonblocking
             ngx.timer.at(0, mirror, provider, body, request_data)
