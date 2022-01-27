@@ -96,13 +96,13 @@ At the moment we have tested with ETH mainnet & testnet, as well as other EVM ch
 ### Provider Configuration
 This service can mirror ETH transaction broadcasts to a variety of existing RPC API providers. Generally, it should be straightforward to integrate any provider you want, assuming they have a JSON-RPC compliant API. See the <a href="#supported-provider-types">Supported Provider Types</a> section for more detail. For configuration, you will need all necessary API keys or other credentials.
 
-Provider configurations are stored in <a href="src/networks.json">src/networks.json</a>. The top-level keys indicate which providers should be used for each network (i.e. Mainnet, Kovan, Testing) and then each list item specifies provider details.
+Provider configurations are stored in <a href="src/networks.json">src/networks.json</a>. The top-level keys indicate which providers should be used for each network and then each list item specifies provider details. The top-level key should be set to an integer that indicates the `chain_id` for the corresponding network (e.g. `1` for ETH Mainnet, `137` for Polygon Mainnet, or `56` for BSC Mainnet). See [Chainlist](https://chainlist.org/) as a reference.
 
 * `name` only for logging purposes
 * `type` one of `json-rpc, json-rpc-with-basic-auth, etherscan` depending on your provider (most will be `json-rpc`)
 * `uri` the URL where transactions should be mirrored to, including any necessary API keys or query parameters. The service will typically deliver transaction data in the body of a POST request to this URL (depending on provider type).
 
-**Note:** If building with docker-compose, configure the `ETH_NETWORK` environment variable inside of the `.env` file.
+**Note:** If you wish to run a separate container for each network, you can specify the `ETH_NETWORK` environment variable. If `ETH_NETWORK` _is_ specified, it will only respond to requests for that specific chain, and any `chain_id` URL parameter will be ignored. If it _is not_ specified (the default), the container will attempt to look up the corresponding `chain_id` specified in the request URL and map it to the available providers in `networks.json`.
 
 #### Supported Provider Types
 Currently the service supports three methods of authentication and relaying transactions. See <a href="src/networks.json">src/networks.json</a> for examples.
@@ -146,6 +146,8 @@ Basic docker-compose example included. For production use, this must be run behi
 
 The service expects `eth_sendRawTransaction` requests in standard JSON-RPC format. It will ignore any request that is not an HTTP POST with `"method":"eth_sendRawTransaction"`. The service can accept batched requests.
 
+Your request should include `chain_id` as a URL parameter, with the value set to the [chain id](https://chainlist.org/) of the network you are broadcasting transactions for.
+
 The service returns `HTTP 200` upon receipt of a properly formatted request and `HTTP 400` for all other invalid requests. `HTTP 401` is returned to unauthorized users.
 
 1. Run local development environment
@@ -156,7 +158,7 @@ The service returns `HTTP 200` upon receipt of a properly formatted request and 
 ### With a Chainlink Node
 A Chainlink Node can leverage a broadcast mirror by setting the [ETH\_SECONDARY\_URLS](https://docs.chain.link/docs/configuration-variables/#eth_secondary_urls) env var
 ```
-ETH_SECONDARY_URLS="https://user123:passABC@broadcast-mirror-host.example/"
+ETH_SECONDARY_URLS="https://user123:passABC@broadcast-mirror-host.example/?chain_id=N"
 ```
 
 ### Transaction Deduplication
