@@ -6,6 +6,7 @@ local config = require("config")
 
 -- VARS
 local txns = ngx.shared.txns
+local expire_time = 5
 local request_status = {
     ["id"] = nil,
     ["msg"] = nil,
@@ -42,11 +43,13 @@ end
 local function txn_seen(txn)
     -- returns false if we should process this txn
     -- returns true if txn already seen (skip it)
+    -- entries are evicted after expire_time seconds, to allow for legitimate
+    -- rebroadcasting in the event of a reorg
     local sha224 = resty_sha224:new()
     sha224:update(txn)
     local hex = str.to_hex(sha224:final())
     log(ngx.INFO, { msg = "Transaction hashed", hash = hex })
-    local success, err, _ = txns:add(hex, "")
+    local success, err, _ = txns:add(hex, "", expire_time)
     if not success then
         if err == "exists" then
             -- already handled
