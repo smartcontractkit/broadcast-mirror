@@ -2,6 +2,7 @@ local config = {}
 
 local json = require("cjson")
 
+local version = "1.1.0"
 local config_env = os.getenv("NETCONFIG_PATH")
 local config_path = "/app/networks.json"
 if config_env ~= nil then
@@ -14,6 +15,10 @@ file:close()
 
 local _, parsed = pcall(json.decode, content)
 local network = os.getenv("ETH_NETWORK")
+
+function config.version()
+    return "BroadcastMirror/v" .. version .. "/nginx" .. ngx.config.nginx_version
+end
 
 function config.network()
     return network

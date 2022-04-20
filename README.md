@@ -144,7 +144,7 @@ Currently the service supports three methods of authentication and relaying tran
 
 Basic docker-compose example included. For production use, this must be run behind a reverse proxy that can provide HTTPS termination (e.g. k8s ingress-nginx or traefik).
 
-The service expects `eth_sendRawTransaction` requests in standard JSON-RPC format. It will ignore any request that is not an HTTP POST with `"method":"eth_sendRawTransaction"`. The service can accept batched requests.
+The service expects `eth_sendRawTransaction` requests in standard JSON-RPC format. It will ignore any request that is not one of the following JSON-RPC methods: `eth_sendRawTransaction,eth_chainId,web3_clientVersion`. The service can accept batched requests.
 
 Your request should include `chain_id` as a URL parameter, with the value set to the [chain id](https://chainlist.org/) of the network you are broadcasting transactions for.
 
@@ -160,6 +160,18 @@ A Chainlink Node can leverage a broadcast mirror by setting the [ETH\_SECONDARY\
 ```
 ETH_SECONDARY_URLS="https://user123:passABC@broadcast-mirror-host.example/?chain_id=N"
 ```
+
+### Dryrun (Testing)
+You can supply the query parameter `&dryrun=1`, which will cause the service to _not_ mirror any transactions, while still processing the original request as usual. This can be useful in testing scenarios when you do not wish to consume RPC provider resources or API quotas.
+
+### Additional Methods
+Aside from `eth_sendRawTransaction`, the service supports the following JSON-RPC methods
+
+#### eth_chainId
+This will return the hexadecimal chain ID that the mirror service is currently operating on. This can be used to validate nodes are connected to the proper mirror for their chain.
+
+#### web3_clientVersion
+This will return a version identifier for the broadcast mirror service, including the service's nginx version.
 
 ### Transaction Deduplication
 The service hashes all incoming transaction data and maintains a set of these already-process transactions. If the hash of an incoming transaction matches an existing hash in the set, the new transaction is not processed any further. This mitigates the potential for overrunning your RPC API quota(s) and avoids any loop scenarios where one broadcast mirror is configured to daisy-chain into another. Please note the list of seen transactions is stored in-memory and would be cleared by a service restart and seen transaction state would not be shared if multiple broadcast mirror services were run behind a load-balancer.

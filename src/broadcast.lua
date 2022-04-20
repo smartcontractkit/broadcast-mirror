@@ -8,8 +8,10 @@ local config = require("config")
 local txns = ngx.shared.txns
 local expire_time = 5
 local request_status = {
+    -- when 'bypass' is true, do not send any mirror requests
     ["id"] = nil,
     ["msg"] = nil,
+    ["bypass"] = false,
 }
 
 -- FUNCS
@@ -19,6 +21,10 @@ local function get_network()
     else
         return config.network()
     end
+end
+
+local function is_dryrun()
+    return ngx.var.arg_dryrun ~= nil
 end
 
 local function log(log_level, msg, request_data)
@@ -79,8 +85,24 @@ local function validate(value)
         return
     end
 
+    if value.method == "web3_clientVersion" then
+        request_status.msg = config.version()
+        request_status.bypass = true
+        return
+    end
+
+    if value.method == "eth_chainId" then
+        request_status.msg = string.format("%#x", tonumber(get_network()))
+        request_status.bypass = true
+        return
+    end
+
     if value.method ~= "eth_sendRawTransaction" then
-        log(ngx.INFO, { msg = "Unsupported RPC call", call = value.method, id = value.id })
+        -- WARN on unimplemented methods
+        local msg = "Unsupported RPC call"
+        log(ngx.WARN, { msg = msg, call = value.method, id = value.id })
+        request_status.msg = msg
+        request_status.id = value.id
         return
     end
 
@@ -92,12 +114,15 @@ local function validate(value)
         return
     end
 
-    if txn_seen(value.params[1]) then
-        log(ngx.INFO, { msg = "Transaction already seen, skipping.", id = value.id })
-        return
-    else
-        return value
+    if not is_dryrun() then
+        -- checks if txn hash has been seen, if not, adds to list of seen hashes
+        if txn_seen(value.params[1]) then
+            log(ngx.INFO, { msg = "Transaction already seen, skipping.", id = value.id })
+            return
+        end
     end
+
+    return value
 end
 
 local function mirror(_, provider, body, request_data)
@@ -194,7 +219,7 @@ for _, value in ipairs(values) do
     -- since we can have multiple txns per request,
     -- nginx returns status of last parsed transaction
     local body = validate(value)
-    if body ~= nil then
+    if body ~= nil and request_status.bypass ~= true and not is_dryrun() then
         for _, provider in config.providers(get_network()) do
             -- threads dont have access to ngx.var, pass in for logging
             local request_data = {
@@ -214,8 +239,12 @@ local response = {
     ["id"] = request_status.id,
 }
 
-if request_status.msg == nil then
-    response.result = ""
+if request_status.msg == nil or request_status.bypass == true then
+    if request_status.msg ~= nil then
+        response.result = request_status.msg
+    else
+        response.result = ""
+    end
     ngx.status = ngx.HTTP_OK
 else
     response.error = {

@@ -59,9 +59,9 @@ def test_unsupported_method(broadcast_mirror_service):
         },
         auth=sample_auth,
     )
-    assert r.status_code == 200
+    assert r.status_code == 400
     assert r.json()["id"] == 1
-    assert r.json()["result"] == ""
+    assert r.json()["error"]["message"] == "Unsupported RPC call"
 
 
 def test_empty_sendRawTxn(broadcast_mirror_service):
@@ -243,3 +243,37 @@ def test_multi_post_mixed(broadcast_mirror_service):
     assert r.status_code == 400
     assert r.json()["id"] == 13
     assert r.json()["error"]["code"] == -32000
+
+def test_chainid(broadcast_mirror_multichain_service):
+    """Ensure chainID response is correct"""
+    r = requests.post(
+        broadcast_mirror_multichain_service,
+        json={
+            "jsonrpc": "2.0",
+            "method": "eth_chainId",
+            "params": [],
+            "id": 100,
+        },
+        auth=sample_auth,
+        params={"chain_id": "56"},
+    )
+    assert r.status_code == 200
+    assert r.json()["id"] == 100
+    assert r.json()["result"] == "0x38"
+
+def test_clientversion(broadcast_mirror_multichain_service):
+    """Ensure clientVersion response is correct"""
+    r = requests.post(
+        broadcast_mirror_multichain_service,
+        json={
+            "jsonrpc": "2.0",
+            "method": "web3_clientVersion",
+            "params": [],
+            "id": 101,
+        },
+        auth=sample_auth,
+        params={"chain_id": "56"},
+    )
+    assert r.status_code == 200
+    assert r.json()["id"] == 101
+    assert r.json()["result"].startswith("BroadcastMirror/v")
